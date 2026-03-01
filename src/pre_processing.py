@@ -13,9 +13,7 @@ def get_duration(times):
     x = np.fromstring(times.strip("[]"), sep=',')
     return float(x[-1] - x[0]) if len(x) > 0 else 0.0
 
-from sklearn.decomposition import PCA
-
-# Never used currently
+"""
 def get_pca_score(x_list, y_list, z_list):
     trajectory = np.column_stack((x_list, y_list, z_list))
 
@@ -35,8 +33,44 @@ def get_pca_score(x_list, y_list, z_list):
     score = (v2 - v3) / v1
 
     return score, v1, v2, v3
+"""
 
+def get_local_2d_circularity(x_list, y_list, window_size=20):
+    # Notice we only stack X and Y
+    trajectory = np.column_stack((x_list, y_list))
+    n_points = len(trajectory)
+    local_scores = np.zeros(n_points)
+
+    for i in range(n_points):
+        start = max(0, i - window_size // 2)
+        end = min(n_points, i + window_size // 2)
+        window = trajectory[start:end]
+
+        if len(window) < 2:
+            continue
+
+        # Covariance for 2D (results in 2x2 matrix)
+        cov_matrix = np.cov(window, rowvar=False, bias=True)
+
+        # Get the 2 eigenvalues (v1, v2)
+        evals = np.linalg.eigvalsh(cov_matrix)
+        evals = np.sort(evals)[::-1]
+
+        v1 = evals[0]
+        v2 = evals[1] if len(evals) > 1 else 0
+
+        # Circularity score for 2D
+        # If v1 == v2, the shape is a perfect circle.
+        # Score approaches 1.0 for circles and 0 for straight lines.
+        score = v2 / v1 if v1 > 1e-9 else 0.0
+        local_scores[i] = score
+
+    return local_scores
+
+"""
 def get_local_circularity(x_list, y_list, z_list, window_size=20):
+    x_list *= 100000
+    y_list *= 100000
     trajectory = np.column_stack((x_list, y_list, z_list))
     n_points = len(trajectory)
 
@@ -58,29 +92,19 @@ def get_local_circularity(x_list, y_list, z_list, window_size=20):
             local_scores.append(0.0)
             continue
 
-        # Center the data (requirement for PCA)
-        window_centered = window - np.mean(window, axis=0)
-
-        # Calculate Covariance Matrix
-        cov_matrix = np.cov(window_centered, rowvar=False)
-
-        # Get Eigenvalues (v1, v2, v3)
-        # These are the variances explained by each component
-        evals = np.linalg.eigvalsh(cov_matrix)
-
-        # Sort them descending
-        evals = sorted(evals, reverse=True)
-        v1, v2, v3 = evals / np.sum(evals)
+        pca = PCA(n_components=3)
+        pca.fit(window)
+        v1, v2, v3 = pca.explained_variance_ratio_
 
         # Calculate the same circularity score, but just for this window
         score = (v2 - v3) / v1
         local_scores.append(score)
 
     return local_scores
-
+"""
 # Wrapper for df batch apply
 def apply_pca_local(row):
-    return get_local_circularity(row['latitude'], row['longitude'], row['altitude'])
+    return get_local_2d_circularity(row['latitude'], row['longitude'])
 
 import pandas as pd
 
@@ -91,7 +115,7 @@ def df_transform(df):
 
     # Original data after filtering
     parsed_data = df['trajectory'].apply(parse_ewkb)
-    df_tr[['latitude', 'longitude', 'altitude', 'rcs']] = pd.DataFrame(parsed_data.tolist(), index=df.index)
+    df_tr[['longitude', 'latitude', 'altitude', 'rcs']] = pd.DataFrame(parsed_data.tolist(), index=df.index)
     df_tr['airspeed'] = df['airspeed']
     df_tr['min_z'] = df['min_z']
     df_tr['max_z'] = df['max_z']
