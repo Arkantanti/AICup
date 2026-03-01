@@ -36,7 +36,6 @@ def get_pca_score(x_list, y_list, z_list):
 """
 
 def get_local_2d_circularity(x_list, y_list, window_size=20):
-    # Notice we only stack X and Y
     trajectory = np.column_stack((x_list, y_list))
     n_points = len(trajectory)
     local_scores = np.zeros(n_points)
@@ -67,10 +66,10 @@ def get_local_2d_circularity(x_list, y_list, window_size=20):
 
     return local_scores
 
-"""
-def get_local_circularity(x_list, y_list, z_list, window_size=20):
-    x_list *= 100000
-    y_list *= 100000
+
+
+
+def get_local_3d_circularity(x_list, y_list, z_list, window_size=20):
     trajectory = np.column_stack((x_list, y_list, z_list))
     n_points = len(trajectory)
 
@@ -78,37 +77,52 @@ def get_local_circularity(x_list, y_list, z_list, window_size=20):
         return [0.0] * n_points
 
     local_scores = []
+    half_win = window_size // 2
 
-    # Slide the window across the trajectory
     for i in range(n_points):
-        # Define window boundaries (centered on the current point)
-        start = max(0, i - window_size // 2)
-        end = min(n_points, i + window_size // 2)
-
+        start = max(0, i - half_win)
+        end = min(n_points, i + half_win)
         window = trajectory[start:end]
 
-        # We need at least 3 points for 3D PCA
         if len(window) < 3:
             local_scores.append(0.0)
             continue
 
-        pca = PCA(n_components=3)
-        pca.fit(window)
-        v1, v2, v3 = pca.explained_variance_ratio_
+        # PCA Step 1: Center the data
+        centered_matrix = window - np.mean(window, axis=0)
 
-        # Calculate the same circularity score, but just for this window
+        # PCA Step 2: Singular Value Decomposition
+        # s contains the singular values.
+        # The eigenvalues of the covariance matrix are proportional to s**2.
+        _, s, _ = np.linalg.svd(centered_matrix, full_matrices=False)
+
+        # Calculate explained variance (eigenvalues)
+        eigenvalues = s ** 2
+
+        # Calculate explained variance ratio (v1, v2, v3)
+        v = eigenvalues / np.sum(eigenvalues)
+
+        # Handle cases where v might have fewer than 3 components due to alignment
+        v1 = v[0] if len(v) > 0 else 1e-9
+        v2 = v[1] if len(v) > 1 else 0.0
+        v3 = v[2] if len(v) > 2 else 0.0
+
+        # Calculate local circularity score
         score = (v2 - v3) / v1
         local_scores.append(score)
 
     return local_scores
-"""
+
 # Wrapper for df batch apply
-def apply_pca_local(row):
+def apply_2dpca_local(row):
     return get_local_2d_circularity(row['latitude'], row['longitude'])
+
+def apply_3dpca_local(row):
+    return get_local_3d_circularity(row['latitude'], row['longitude'], row['altitude'])
 
 import pandas as pd
 
-def df_transform(df):
+def df_transform(df, labels=False):
     df = df.copy()
     df_tr = pd.DataFrame(index=df.index)
     df_tr['track_id'] = df['track_id']
@@ -131,8 +145,14 @@ def df_transform(df):
     df_tr['height_fluctuation'] = df_tr['altitude'].apply(np.max) - df_tr['altitude'].apply(np.min)
     df_tr['latitude_fluctuation'] = df_tr['latitude'].apply(np.max) - df_tr['latitude'].apply(np.min)
     df_tr['longitude_fluctuation'] = df_tr['longitude'].apply(np.max) - df_tr['longitude'].apply(np.min)
-    df_tr['local_circularity_scores'] = df_tr.apply(apply_pca_local, axis=1)
-    df_tr['local_circularity_max'] = df_tr['local_circularity_scores'].apply(np.max)
+    df_tr['local_2d_circularity_scores'] = df_tr.apply(apply_2dpca_local, axis=1)
+    df_tr['local_3d_circularity_scores'] = df_tr.apply(apply_3dpca_local, axis=1)
+    df_tr['local_2d_circularity_max'] = df_tr['local_2d_circularity_scores'].apply(np.max)
+    df_tr['local_3d_circularity_mean'] = df_tr['local_3d_circularity_scores'].apply(np.mean)
 
-    df_tr = df_tr.drop(columns=['latitude', 'longitude', 'altitude', 'rcs', 'local_circularity_scores'])
+    df_tr = df_tr.drop(columns=['latitude', 'longitude', 'altitude', 'rcs', 'local_2d_circularity_scores',
+                                'local_3d_circularity_scores'])
+    if labels:
+        df_tr['bird_group'] = df['bird_group']
+
     return df_tr
