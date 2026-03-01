@@ -26,6 +26,8 @@ requirements = [
     ("jupyterlab", None),
     ("torch", None),
     ("torchmetrics", None),
+    ("shapely", None),
+    ("seaborn", None),
 ]
 
 for name, ver in requirements:
