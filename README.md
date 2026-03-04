@@ -1,0 +1,2 @@
+Wandb key:
+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

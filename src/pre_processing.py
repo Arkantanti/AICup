@@ -156,3 +156,68 @@ def df_transform(df, labels=False):
         df_tr['bird_group'] = df['bird_group']
 
     return df_tr
+
+def df_transform_experimental(df, labels=False):
+    df = df.copy()
+    df_tr = pd.DataFrame(index=df.index)
+    df_tr['track_id'] = df['track_id']
+
+    # 1. Parse Trajectory Data
+    # Note: parse_ewkb must return a list of lists/arrays for this expansion to work
+    parsed_data = df['trajectory'].apply(parse_ewkb)
+    df_tr[['longitude', 'latitude', 'altitude', 'rcs']] = pd.DataFrame(parsed_data.tolist(), index=df.index)
+    
+    # 2. Map Original Physical Features
+    df_tr['airspeed'] = df['airspeed']
+    df_tr['min_z'] = df['min_z']
+    df_tr['max_z'] = df['max_z']
+
+    # 3. Robust Dummy Encoding
+    # Added 'dtype=int' and removed 'drop_first=True' to ensure every bird size has its own column.
+    # This is safer for ranking models like XGBoost.
+    size_dummies = pd.get_dummies(df['radar_bird_size'], prefix='size', dtype=int)
+    df_tr = pd.concat([df_tr, size_dummies], axis=1)
+
+    # 4. Derived Features (Vectorized where possible)
+    df_tr['duration'] = df['trajectory_time'].apply(get_duration)
+    
+    # RCS Statistics
+    df_tr['avg_rcs'] = df_tr['rcs'].apply(np.mean)
+    df_tr['std_rcs'] = df_tr['rcs'].apply(np.std)
+    df_tr['min_rcs'] = df_tr['rcs'].apply(np.min)
+    df_tr['max_rcs'] = df_tr['rcs'].apply(np.max)
+    
+    # Spatial Fluctuation
+    df_tr['height_fluctuation'] = df_tr['altitude'].apply(lambda x: np.max(x) - np.min(x))
+    df_tr['latitude_fluctuation'] = df_tr['latitude'].apply(lambda x: np.max(x) - np.min(x))
+    df_tr['longitude_fluctuation'] = df_tr['longitude'].apply(lambda x: np.max(x) - np.min(x))
+    
+    # PCA / Circularity Features
+    df_tr['local_2d_scores'] = df_tr.apply(apply_2dpca_local, axis=1)
+    df_tr['local_3d_scores'] = df_tr.apply(apply_3dpca_local, axis=1)
+    df_tr['local_2d_circularity_max'] = df_tr['local_2d_scores'].apply(np.max)
+    df_tr['local_3d_circularity_mean'] = df_tr['local_3d_scores'].apply(np.mean)
+
+    # 5. Cleanup
+    # Dropping raw list columns to keep the dataframe purely numerical for the model
+    cols_to_drop = ['latitude', 'longitude', 'altitude', 'rcs', 'local_2d_scores', 'local_3d_scores']
+    df_tr = df_tr.drop(columns=[c for c in cols_to_drop if c in df_tr.columns])
+    
+    if labels and 'bird_group' in df.columns:
+        df_tr['bird_group'] = df['bird_group']
+
+    return df_tr
+
+def prepare_for_training(df_transformed, target_col='bird_group'):
+    # Identify numerical features, excluding IDs and the target
+    features = [c for c in df_transformed.columns if c not in ['track_id', target_col]]
+    
+    X = df_transformed[features].copy()
+    
+    # Ensure all data is numeric (XGBoost requirement)
+    X = X.select_dtypes(include=[np.number])
+    
+    # Handle Target
+    y = df_transformed[target_col].astype('category').cat.codes
+    
+    return X, y, features
