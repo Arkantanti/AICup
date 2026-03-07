@@ -155,69 +155,76 @@ def df_transform(df, labels=False):
     if labels:
         df_tr['bird_group'] = df['bird_group']
 
+
     return df_tr
 
-def df_transform_experimental(df, labels=False):
+from sklearn.preprocessing import OneHotEncoder
+
+def df_transform_experimental(df, features_config, labels=False):
     df = df.copy()
     df_tr = pd.DataFrame(index=df.index)
     df_tr['track_id'] = df['track_id']
 
-    # 1. Parse Trajectory Data
-    # Note: parse_ewkb must return a list of lists/arrays for this expansion to work
     parsed_data = df['trajectory'].apply(parse_ewkb)
     df_tr[['longitude', 'latitude', 'altitude', 'rcs']] = pd.DataFrame(parsed_data.tolist(), index=df.index)
     
-    # 2. Map Original Physical Features
     df_tr['airspeed'] = df['airspeed']
     df_tr['min_z'] = df['min_z']
     df_tr['max_z'] = df['max_z']
 
-    # 3. Robust Dummy Encoding
-    # Added 'dtype=int' and removed 'drop_first=True' to ensure every bird size has its own column.
-    # This is safer for ranking models like XGBoost.
-    size_dummies = pd.get_dummies(df['radar_bird_size'], prefix='size', dtype=int)
-    df_tr = pd.concat([df_tr, size_dummies], axis=1)
+    if(features_config['size_encoding']=='one_hot'):
+        ALL_SIZES = ['Small bird', 'Large bird', 'Flock', 'Medium bird']
+        for size in ALL_SIZES:
+            df_tr[f'size_{size}'] = (df['radar_bird_size'] == size).astype(int)
+    elif(features_config['size_encoding']=='ordinal'):
+        df_tr['is_flock'] = (df['radar_bird_size']=='Flock').astype(int)
+        size_map = {'Large bird': 2, 'Medium bird': 1, 'Small bird': 0}
+        df_tr['bird_size'] = df['radar_bird_size'].map(size_map)
 
-    # 4. Derived Features (Vectorized where possible)
     df_tr['duration'] = df['trajectory_time'].apply(get_duration)
     
-    # RCS Statistics
-    df_tr['avg_rcs'] = df_tr['rcs'].apply(np.mean)
-    df_tr['std_rcs'] = df_tr['rcs'].apply(np.std)
-    df_tr['min_rcs'] = df_tr['rcs'].apply(np.min)
-    df_tr['max_rcs'] = df_tr['rcs'].apply(np.max)
+    df_tr['avg_rcs'] = df_tr['rcs'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
+    df_tr['std_rcs'] = df_tr['rcs'].apply(lambda x: np.std(x) if len(x) > 0 else 0.0)
+    df_tr['min_rcs'] = df_tr['rcs'].apply(lambda x: np.min(x) if len(x) > 0 else 0.0)
+    df_tr['max_rcs'] = df_tr['rcs'].apply(lambda x: np.max(x) if len(x) > 0 else 0.0)
     
-    # Spatial Fluctuation
-    df_tr['height_fluctuation'] = df_tr['altitude'].apply(lambda x: np.max(x) - np.min(x))
-    df_tr['latitude_fluctuation'] = df_tr['latitude'].apply(lambda x: np.max(x) - np.min(x))
-    df_tr['longitude_fluctuation'] = df_tr['longitude'].apply(lambda x: np.max(x) - np.min(x))
-    
-    # PCA / Circularity Features
+    df_tr['height_fluctuation'] = df_tr['altitude'].apply(lambda x: np.max(x) - np.min(x) if len(x) > 0 else 0.0)
+    df_tr['latitude_fluctuation'] = df_tr['latitude'].apply(lambda x: np.max(x) - np.min(x) if len(x) > 0 else 0.0)
+    df_tr['longitude_fluctuation'] = df_tr['longitude'].apply(lambda x: np.max(x) - np.min(x) if len(x) > 0 else 0.0)
+
     df_tr['local_2d_scores'] = df_tr.apply(apply_2dpca_local, axis=1)
     df_tr['local_3d_scores'] = df_tr.apply(apply_3dpca_local, axis=1)
-    df_tr['local_2d_circularity_max'] = df_tr['local_2d_scores'].apply(np.max)
-    df_tr['local_3d_circularity_mean'] = df_tr['local_3d_scores'].apply(np.mean)
+    
 
-    # 5. Cleanup
-    # Dropping raw list columns to keep the dataframe purely numerical for the model
-    cols_to_drop = ['latitude', 'longitude', 'altitude', 'rcs', 'local_2d_scores', 'local_3d_scores']
+    df_tr['local_2d_circularity_max'] = df_tr['local_2d_scores'].apply(lambda x: np.max(x) if len(x) > 0 else 0.0)
+    df_tr['local_3d_circularity_mean'] = df_tr['local_3d_scores'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
+
+    cols_to_drop = ['latitude', 'longitude', 'altitude', 'rcs', 
+                    'local_2d_scores', 'local_3d_scores']
     df_tr = df_tr.drop(columns=[c for c in cols_to_drop if c in df_tr.columns])
     
     if labels and 'bird_group' in df.columns:
         df_tr['bird_group'] = df['bird_group']
 
+
     return df_tr
 
-def prepare_for_training(df_transformed, target_col='bird_group'):
-    # Identify numerical features, excluding IDs and the target
+def prepare_for_training(df_transformed, features_config, target_col='bird_group'):
     features = [c for c in df_transformed.columns if c not in ['track_id', target_col]]
-    
     X = df_transformed[features].copy()
+    # X = X.select_dtypes(include=[np.number])
+
+    CLASS_NAMES = ["Clutter", "Cormorants", "Pigeons", "Ducks", "Geese", 
+                   "Gulls", "Birds of Prey", "Waders", "Songbirds"]
+    mapping = {name: i for i, name in enumerate(CLASS_NAMES)}
     
-    # Ensure all data is numeric (XGBoost requirement)
-    X = X.select_dtypes(include=[np.number])
-    
-    # Handle Target
-    y = df_transformed[target_col].astype('category').cat.codes
+    if target_col in df_transformed.columns:
+        # Use .map() to ensure consistency across all folds and test data
+        y = df_transformed[target_col].map(mapping).astype(int)
+    else:
+        y = None
+    for c in features_config:
+        if features_config[c] == False:
+            X.drop(columns=[c], inplace=True)
     
     return X, y, features

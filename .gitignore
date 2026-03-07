@@ -29,6 +29,9 @@ env/
 .env
 .venv/
 
+# --- wandb logs
+training/wandb
+
 # --- Operating System Files ---
 .DS_Store
 Thumbs.db

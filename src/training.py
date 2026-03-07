@@ -53,3 +53,36 @@ def run_cv_training(X, y, class_names, params=None):
         print(f"Fold {fold + 1} | Best Iter: {model.best_iteration} | Score: {model.best_score:.4f}")
 
     return models, oof_preds
+
+def run_training(X, y, class_names, params=None):
+    if params is None:
+        params = {}
+
+    # 1. Handle Parameters
+    # Important: Early stopping is removed here because we train on the 100% of data
+    xgb_params = {
+        'n_estimators': params.get('n_estimators', 1000),
+        'learning_rate': params.get('learning_rate', 0.05),
+        'max_depth': params.get('max_depth', 6),
+        'objective': 'multi:softprob',
+        'num_class': len(class_names),
+        'tree_method': 'hist',
+        'random_state': 42
+    }
+
+    # 2. Compute Weights
+    full_weights = None
+    if params.get('use_weights', False):
+        full_weights = compute_sample_weight('balanced', y)
+
+    # 3. Final Model Training
+    print(f"Training final model on entire dataset ({len(X)} samples)...")
+    model = XGBClassifier(**xgb_params)
+    
+    fit_params = {'verbose': True}
+    if full_weights is not None:
+        fit_params['sample_weight'] = full_weights
+
+    model.fit(X, y, **fit_params)
+
+    return model

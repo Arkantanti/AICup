@@ -92,7 +92,7 @@ def debug_per_class_scores(y_true, y_probs):
     }).sort_values('AP_Score', ascending=False)
     
     print("\n--- Per-Class Performance ---")
-    print(summary)
+    #print(summary)
     return summary
 
 
@@ -129,3 +129,22 @@ def print_detailed_scores(final_score, detailed_scores):
     print("-" * 30)
     for bird, score in detailed_scores.items():
         print(f"{bird:15} | AP: {score:.4f}")
+
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
+CLASS_NAMES = ["Clutter", "Cormorants", "Pigeons", "Ducks", "Geese", "Gulls", "Birds of Prey", "Waders", "Songbirds"]
+
+def plot_bird_confusion(y_true, oof_preds):
+    y_pred = np.argmax(oof_preds, axis=1)
+    
+    # normalize='true' shows percentages relative to the actual ground truth labels
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(CLASS_NAMES)), normalize='true')
+    
+    fig, ax = plt.subplots(figsize=(12, 10))
+    # values_format='.2f' ensures percentages are readable (e.g., 0.85)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASS_NAMES)
+    disp.plot(ax=ax, cmap='Blues', xticks_rotation=45, values_format='.2f')
+    
+    plt.title("Normalized Bird Species Confusion Matrix (Recall %)")
+    plt.tight_layout()
+    plt.show()
