@@ -25,6 +25,8 @@ env/
 
 # --- wandb logs
 training/wandb
+wandb/
+**/wandb/
 
 # --- Operating System Files ---
 .DS_Store
