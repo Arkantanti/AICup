@@ -2,6 +2,7 @@ import numpy as np
 from xgboost import XGBClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.utils.class_weight import compute_sample_weight
+from custom_scoring import macro_ap_xgboost
 
 def run_cv_training(X, y, class_names, params=None):
     """
@@ -21,8 +22,10 @@ def run_cv_training(X, y, class_names, params=None):
         'num_class': len(class_names),
         'tree_method': 'hist',
         'early_stopping_rounds': params.get('early_stopping_rounds', 50),
-        'random_state': 42
+        'random_state': 42,
+        'eval_metric': macro_ap_xgboost
     }
+
 
     oof_preds = np.zeros((len(X), len(class_names)))
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -50,7 +53,7 @@ def run_cv_training(X, y, class_names, params=None):
         oof_preds[val_idx] = model.predict_proba(X_val)
         models.append(model)
         
-        print(f"Fold {fold + 1} | Best Iter: {model.best_iteration} | Score: {model.best_score:.4f}")
+        print(f"Fold {fold + 1} | Best Iter: {model.best_iteration} | Score: {1 - model.best_score:.4f}")
 
     return models, oof_preds
 

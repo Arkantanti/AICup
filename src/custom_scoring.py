@@ -15,15 +15,34 @@ def calculate_macro_ap(y_true_codes, y_prob_matrix, class_names):
     # 2. Calculate AP for each class individually
     # This follows the 'Sweep' logic we discussed earlier
     individual_aps = average_precision_score(
-        y_true_one_hot, 
-        y_prob_matrix, 
+        y_true_one_hot,
+        y_prob_matrix,
         average=None  # Returns an array of 9 scores
     )
 
     # 3. Create a readable summary
     score_registry = dict(zip(class_names, individual_aps))
-    
+
     # 4. Compute the Macro Average (The final competition metric)
     macro_ap = np.mean(individual_aps)
-    
+
     return macro_ap, score_registry
+
+def macro_ap_xgboost(labels, preds):
+
+    #print(labels, preds)
+
+    y_true_one_hot = pd.get_dummies(labels).reindex(
+            columns=range(9),
+            fill_value=0
+        ).values
+
+    individual_aps = average_precision_score(
+        y_true_one_hot,
+        preds,
+        average=None
+    )
+
+    score = np.mean(individual_aps)
+
+    return 1 - score
