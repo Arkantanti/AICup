@@ -28,7 +28,7 @@ def run_cv_training(X, y, class_names, params=None):
 
 
     oof_preds = np.zeros((len(X), len(class_names)))
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
     models = []
 
     # 2. Compute Full Weights if requested in config
