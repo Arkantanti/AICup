@@ -158,7 +158,6 @@ def df_transform(df, labels=False):
 
     return df_tr
 
-from sklearn.preprocessing import OneHotEncoder
 
 def df_transform_experimental(df, features_config, labels=False):
     df = df.copy()
@@ -172,17 +171,25 @@ def df_transform_experimental(df, features_config, labels=False):
     df_tr['min_z'] = df['min_z']
     df_tr['max_z'] = df['max_z']
 
-    if(features_config['size_encoding']=='one_hot'):
-        ALL_SIZES = ['Small bird', 'Large bird', 'Flock', 'Medium bird']
-        for size in ALL_SIZES:
+    if features_config['size_encoding']=='one_hot':
+        all_sizes = ['Small bird', 'Large bird', 'Flock', 'Medium bird']
+        for size in all_sizes:
             df_tr[f'size_{size}'] = (df['radar_bird_size'] == size).astype(int)
-    elif(features_config['size_encoding']=='ordinal'):
+    elif features_config['size_encoding']=='ordinal':
         df_tr['is_flock'] = (df['radar_bird_size']=='Flock').astype(int)
         size_map = {'Large bird': 2, 'Medium bird': 1, 'Small bird': 0}
         df_tr['bird_size'] = df['radar_bird_size'].map(size_map)
 
     df_tr['duration'] = df['trajectory_time'].apply(get_duration)
-    
+
+    df_tr['timestamp_start'] = pd.to_datetime(df['timestamp_start_radar_utc'])
+    df_tr['hour'] = df_tr['timestamp_start'].dt.hour
+    df_tr['hour_sin'] = np.sin(2 * np.pi * df_tr['hour'] / 24)
+    df_tr['hour_cos'] = np.cos(2 * np.pi * df_tr['hour'] / 24)
+    df_tr['day_of_year'] = df_tr['timestamp_start'].dt.dayofyear
+    df_tr['day_sin'] = np.sin(2 * np.pi * df_tr['day_of_year'] / 365)
+    df_tr['day_cos'] = np.cos(2 * np.pi * df_tr['day_of_year'] / 365)
+
     df_tr['avg_rcs'] = df_tr['rcs'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
     df_tr['std_rcs'] = df_tr['rcs'].apply(lambda x: np.std(x) if len(x) > 0 else 0.0)
     df_tr['min_rcs'] = df_tr['rcs'].apply(lambda x: np.min(x) if len(x) > 0 else 0.0)
@@ -191,6 +198,9 @@ def df_transform_experimental(df, features_config, labels=False):
     df_tr['height_fluctuation'] = df_tr['altitude'].apply(lambda x: np.max(x) - np.min(x) if len(x) > 0 else 0.0)
     df_tr['latitude_fluctuation'] = df_tr['latitude'].apply(lambda x: np.max(x) - np.min(x) if len(x) > 0 else 0.0)
     df_tr['longitude_fluctuation'] = df_tr['longitude'].apply(lambda x: np.max(x) - np.min(x) if len(x) > 0 else 0.0)
+    df_tr['height_fluctuation_scaled'] = df_tr['height_fluctuation'] / df_tr['duration']
+    df_tr['latitude_fluctuation_scaled'] = df_tr['latitude_fluctuation'] / df_tr['duration']
+    df_tr['longitude_fluctuation'] = df_tr['longitude_fluctuation'] / df_tr['duration']
 
     df_tr['local_2d_scores'] = df_tr.apply(apply_2dpca_local, axis=1)
     df_tr['local_3d_scores'] = df_tr.apply(apply_3dpca_local, axis=1)
@@ -200,7 +210,8 @@ def df_transform_experimental(df, features_config, labels=False):
     df_tr['local_3d_circularity_mean'] = df_tr['local_3d_scores'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
 
     cols_to_drop = ['latitude', 'longitude', 'altitude', 'rcs', 
-                    'local_2d_scores', 'local_3d_scores']
+                    'local_2d_scores', 'local_3d_scores', 'timestamp_start', 'day_of_year',
+                    'hour']
     df_tr = df_tr.drop(columns=[c for c in cols_to_drop if c in df_tr.columns])
     
     if labels and 'bird_group' in df.columns:
