@@ -21,3 +21,5 @@ dependencies:
     - wandb
     - pyqt
     - qtconsole
+    - imbalanced-learn
+    - catboost

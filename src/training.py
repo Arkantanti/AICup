@@ -3,8 +3,9 @@ from xgboost import XGBClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.utils.class_weight import compute_sample_weight
 from custom_scoring import macro_ap_xgboost
+from catboost import CatBoostClassifier
 
-def run_cv_training(X, y, class_names, params=None):
+def run_cv_training_xgboost(X, y, class_names, params=None):
     """
     Executes Stratified K-Fold training and returns models + OOF predictions.
     Incorporates class weighting based on the 'use_weights' parameter in config.
@@ -34,7 +35,7 @@ def run_cv_training(X, y, class_names, params=None):
     # 2. Compute Full Weights if requested in config
     full_weights = None
     if params.get('use_weights', False):
-        full_weights = compute_sample_weight('balanced', y)
+       full_weights = compute_sample_weight('balanced', y)
 
     # 3. Training Loop
     for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
@@ -56,6 +57,43 @@ def run_cv_training(X, y, class_names, params=None):
         print(f"Fold {fold + 1} | Best Iter: {model.best_iteration} | Score: {1 - model.best_score:.4f}")
 
     return models, oof_preds
+
+def run_cv_training_cat(X, y, class_names, params=None):
+    cb_params = {
+        'iterations': 1000,
+        'learning_rate': 0.05,
+        'depth': 6,
+        'loss_function': 'MultiClass',
+        'eval_metric': 'TotalF1',
+        'random_seed': 42,
+        'verbose': False,
+        'auto_class_weights': 'Balanced'
+    }
+    oof_preds = np.zeros((len(X), len(class_names)))
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    models = []
+
+    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
+        X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+        y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+
+        model = CatBoostClassifier(**cb_params)
+
+        # CatBoost uses 'eval_set' just like XGBoost
+        model.fit(
+            X_train, y_train,
+            eval_set=(X_val, y_val),
+            early_stopping_rounds=50
+        )
+
+        oof_preds[val_idx] = model.predict_proba(X_val)
+        models.append(model)
+
+        # CatBoost best_score_ returns a dict of metrics
+        print(f"Fold {fold + 1} | Best Score: {model.get_best_score()}")
+
+    return models, oof_preds
+
 
 def run_training(X, y, class_names, params=None):
     if params is None:
