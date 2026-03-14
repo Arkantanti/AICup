@@ -116,7 +116,10 @@ def plot_feature_importance(models, features, top_n=15):
     feat_imp = pd.Series(importances, index=features).sort_values(ascending=True)
     
     plt.figure(figsize=(10, 6))
-    feat_imp.tail(top_n).plot(kind='barh', color='skyblue')
+    if top_n == -1:
+        feat_imp.plot(kind='barh', color='skyblue')
+    else:
+        feat_imp.tail(top_n).plot(kind='barh', color='skyblue')
     plt.title(f'Top {top_n} Most Influential Features')
     plt.xlabel('Average Gain/Importance')
     plt.show()
@@ -131,21 +134,6 @@ def print_detailed_scores(final_score, detailed_scores):
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 CLASS_NAMES = ["Clutter", "Cormorants", "Pigeons", "Ducks", "Geese", "Gulls", "Birds of Prey", "Waders", "Songbirds"]
-
-def plot_bird_confusion(y_true, oof_preds):
-    y_pred = np.argmax(oof_preds, axis=1)
-    
-    # normalize='true' shows percentages relative to the actual ground truth labels
-    cm = confusion_matrix(y_true, y_pred, labels=range(len(CLASS_NAMES)), normalize='true')
-    
-    fig, ax = plt.subplots(figsize=(12, 10))
-    # values_format='.2f' ensures percentages are readable (e.g., 0.85)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASS_NAMES)
-    disp.plot(ax=ax, cmap='Blues', xticks_rotation=45, values_format='.2f')
-    
-    plt.title("Normalized Bird Species Confusion Matrix (Recall %)")
-    plt.tight_layout()
-    plt.show()
 
 import seaborn as sns
 
@@ -201,4 +189,79 @@ def plot_bird_feature(df, column_name, title=None, savefig=False, save_path=None
     if savefig:
         plt.savefig(save_path, dpi=300)
 
+    plt.show()
+
+
+def plot_bird_confusion_pretty(y_true, oof_preds):
+    y_pred = np.argmax(oof_preds, axis=1)
+
+    # 1. Create the Confusion Matrix
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(CLASS_NAMES)), normalize='true')
+
+    # 2. Convert to DataFrame for easier Seaborn handling
+    df_cm = pd.DataFrame(cm, index=CLASS_NAMES, columns=CLASS_NAMES)
+
+    # 3. Set the aesthetic style
+    sns.set_theme(style="white")
+    plt.figure(figsize=(14, 11))
+
+    # 4. Create Heatmap
+    # annot=True adds the numbers; fmt='.2f' handles decimals
+    # mask handles cases where you might want to hide zero-values
+    ax = sns.heatmap(df_cm,
+                     annot=True,
+                     fmt='.2g',
+                     cmap='YlGnBu',  # Modern color palette (Yellow-Green-Blue)
+                     linewidths=0.5,
+                     linecolor='lightgrey',
+                     cbar_kws={'label': 'Recall (Percentage of Class Correct)'},
+                     square=True)
+
+    # 5. Beautify Labels
+    plt.title("Bird Species Classification: Normalized Confusion Matrix", fontsize=18, pad=20, fontweight='bold')
+    plt.xlabel("Predicted Species", fontsize=14, labelpad=15)
+    plt.ylabel("Actual Species", fontsize=14, labelpad=15)
+    plt.xticks(rotation=45, ha='right', fontsize=11)
+    plt.yticks(rotation=0, fontsize=11)
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_cumulative_importance(models, features, threshold=0.90):
+    """
+    Plots individual feature importance and the cumulative importance ratio.
+    """
+    importances = np.mean([m.feature_importances_ for m in models], axis=0)
+    # 1. Prepare and Sort Data
+    df = pd.DataFrame({'Feature': features, 'Importance': importances})
+    df = df.sort_values(by='Importance', ascending=False).reset_index(drop=True)
+
+    # 2. Calculate Cumulative Sum
+    df['Cumulative'] = df['Importance'].cumsum() / df['Importance'].sum()
+
+    # 3. Create the Plot
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    # Bar Chart (Individual)
+    ax1.bar(df['Feature'], df['Importance'], color='steelblue', alpha=0.7, label='Individual')
+    ax1.set_ylabel('Importance Score', fontsize=12, fontweight='bold')
+    plt.xticks(rotation=45, ha='right')
+
+    # Line Chart (Cumulative) - Secondary Axis
+    ax2 = ax1.twinx()
+    ax2.plot(df['Feature'], df['Cumulative'], color='crimson', marker='o', markersize=4, label='Cumulative')
+    ax2.set_ylabel('Cumulative Ratio', fontsize=12, fontweight='bold')
+    ax2.set_ylim(0, 1.05)
+
+    # 4. Add Threshold Line
+    ax2.axhline(y=threshold, color='green', linestyle='--', linewidth=2)
+
+    # Find the index where threshold is met for the text label
+    cutoff_idx = np.where(df['Cumulative'] >= threshold)[0][0]
+    ax2.text(cutoff_idx, threshold - 0.05, f' {int(threshold * 100)}% Cutoff',
+             color='green', fontweight='bold', ha='right')
+
+    plt.title('Feature Importance with Cumulative Ratio', fontsize=14)
+    ax1.grid(axis='y', linestyle='--', alpha=0.4)
+    fig.tight_layout()
     plt.show()

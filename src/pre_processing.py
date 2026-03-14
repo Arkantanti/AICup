@@ -186,14 +186,14 @@ def df_transform_experimental(df, features_config, labels=False):
     df_tr['hour'] = df_tr['timestamp_start'].dt.hour
     df_tr['hour_sin'] = np.sin(2 * np.pi * df_tr['hour'] / 24)
     df_tr['hour_cos'] = np.cos(2 * np.pi * df_tr['hour'] / 24)
-    df_tr['day_of_year'] = df_tr['timestamp_start'].dt.dayofyear
-    df_tr['day_sin'] = np.sin(2 * np.pi * df_tr['day_of_year'] / 365)
-    df_tr['day_cos'] = np.cos(2 * np.pi * df_tr['day_of_year'] / 365)
 
     df_tr['avg_rcs'] = df_tr['rcs'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
     df_tr['std_rcs'] = df_tr['rcs'].apply(lambda x: np.std(x) if len(x) > 0 else 0.0)
     df_tr['min_rcs'] = df_tr['rcs'].apply(lambda x: np.min(x) if len(x) > 0 else 0.0)
     df_tr['max_rcs'] = df_tr['rcs'].apply(lambda x: np.max(x) if len(x) > 0 else 0.0)
+
+    df_tr['avg_lat'] = df_tr['latitude'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
+    df_tr['avg_lon'] = df_tr['longitude'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
     
     df_tr['height_fluctuation'] = df_tr['altitude'].apply(lambda x: np.max(x) - np.min(x) if len(x) > 0 else 0.0)
     df_tr['latitude_fluctuation'] = df_tr['latitude'].apply(lambda x: np.max(x) - np.min(x) if len(x) > 0 else 0.0)
@@ -210,7 +210,7 @@ def df_transform_experimental(df, features_config, labels=False):
     df_tr['local_3d_circularity_mean'] = df_tr['local_3d_scores'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
 
     cols_to_drop = ['latitude', 'longitude', 'altitude', 'rcs', 
-                    'local_2d_scores', 'local_3d_scores', 'timestamp_start', 'day_of_year',
+                    'local_2d_scores', 'local_3d_scores', 'timestamp_start',
                     'hour']
     df_tr = df_tr.drop(columns=[c for c in cols_to_drop if c in df_tr.columns])
     
@@ -237,5 +237,6 @@ def prepare_for_training(df_transformed, features_config, target_col='bird_group
     for c in features_config:
         if features_config[c] == False:
             X.drop(columns=[c], inplace=True)
+            features.remove(c)
     
     return X, y, features
