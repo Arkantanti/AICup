@@ -28,6 +28,10 @@ training/wandb
 wandb/
 **/wandb/
 
+# --- catboost logs
+catboost_info/
+**/catboost_info
+
 # --- Operating System Files ---
 .DS_Store
 Thumbs.db
