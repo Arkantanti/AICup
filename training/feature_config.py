@@ -10,24 +10,44 @@ features_config = {
     'size_encoding':'one_hot',
 
     'duration': True,
-    'hour_sin': True,
-    'hour_cos': False,
+    'hour': True,
+    'month': True,
 
     'avg_rcs': True,
-    'std_rcs': False,
+    'std_rcs': True,
     'min_rcs': True,
-    'max_rcs': False,
+    'max_rcs': True,
 
     'avg_lat': True,
     'avg_lon': True,
 
-    'height_fluctuation': False,
+    'height_fluctuation': True,
     'latitude_fluctuation': True,
     'longitude_fluctuation': True,
     'height_fluctuation_scaled': True,
     'longitude_fluctuation_scaled': True,
     'latitude_fluctuation_scaled': True,
 
-    'local_2d_circularity_max': False,
+    'altitude_mean': True,
+    'altitude_std': True,
+    'altitude_climb_mean': True,
+    'altitude_climb_std': True,
+
+    'local_2d_circularity_max': True,
     'local_3d_circularity_mean': True,
+
+    'path_length': True,
+    'step_mean': True,
+    'step_std': True,
+    'speed_mean': True,
+    'speed_std': True,
+
+    'turn_mean': True,
+    'turn_std': True,
+    'curvature_mean': True,
+    'curvature_std': True,
+
+    'acc_mean': True,
+    'acc_std': True,
+
 }
