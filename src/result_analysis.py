@@ -133,23 +133,26 @@ def print_detailed_scores(final_score, detailed_scores):
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-CLASS_NAMES = ["Clutter", "Cormorants", "Pigeons", "Ducks", "Geese", "Gulls", "Birds of Prey", "Waders", "Songbirds"]
+
 
 import seaborn as sns
 
 
-def plot_bird_confusion_pretty(y_true, oof_preds):
+def plot_bird_confusion_pretty(y_true, oof_preds, class_names):
     y_pred = np.argmax(oof_preds, axis=1)
 
     # 1. Create the Confusion Matrix
-    cm = confusion_matrix(y_true, y_pred, labels=range(len(CLASS_NAMES)), normalize='true')
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(class_names)), normalize='true')
 
     # 2. Convert to DataFrame for easier Seaborn handling
-    df_cm = pd.DataFrame(cm, index=CLASS_NAMES, columns=CLASS_NAMES)
+    df_cm = pd.DataFrame(cm, index=class_names, columns=class_names)
 
     # 3. Set the aesthetic style
     sns.set_theme(style="white")
-    plt.figure(figsize=(14, 11))
+    if(len(class_names) > 4):
+        plt.figure(figsize=(14, 11))
+    else:
+        plt.figure(figsize=(7, 4))
 
     # 4. Create Heatmap
     # annot=True adds the numbers; fmt='.2f' handles decimals

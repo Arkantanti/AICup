@@ -13,7 +13,7 @@ def calculate_adversarial(df_train, df_test):
                        df_test.drop(columns=['track_id'], errors='ignore')], axis=0)
     y_adv = np.array([0] * len(df_train) + [1] * len(df_test))
 
-    from xgboost import XGBClassifier
+    from xgboost_train import XGBClassifier
     from sklearn.model_selection import cross_val_score
 
     adv_model = XGBClassifier()

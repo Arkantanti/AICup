@@ -86,14 +86,12 @@ def df_transform_experimental(df, features_config, labels=False):
 
     return df_tr
 
-def prepare_for_training(df_transformed, features_config, target_col='bird_group'):
+def prepare_for_training(df_transformed, features_config, class_names, target_col='bird_group'):
     features = [c for c in df_transformed.columns if c not in ['track_id', target_col]]
     X = df_transformed[features].copy()
     # X = X.select_dtypes(include=[np.number])
 
-    CLASS_NAMES = ["Clutter", "Cormorants", "Pigeons", "Ducks", "Geese", 
-                   "Gulls", "Birds of Prey", "Waders", "Songbirds"]
-    mapping = {name: i for i, name in enumerate(CLASS_NAMES)}
+    mapping = {name: i for i, name in enumerate(class_names)}
     
     if target_col in df_transformed.columns:
         # Use .map() to ensure consistency across all folds and test data
