@@ -65,6 +65,7 @@ def df_transform_experimental(df, features_config, labels=False):
 
     df_tr['local_2d_circularity_max'] = df['local_2d_scores'].apply(lambda x: np.max(x) if len(x) > 0 else 0.0)
     df_tr['local_3d_circularity_mean'] = df['local_3d_scores'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)
+    df_tr['local_3d_circularity_std'] = df['local_3d_scores'].apply(lambda x: np.std(x) if len(x) > 0 else 0.0)
 
     df_tr["path_length"] = df['distances'].apply(lambda x: np.sum(x) if len(x) > 0 else 0.0)
     df_tr["step_mean"] = df['distances'].apply(lambda x: np.mean(x) if len(x) > 0 else 0.0)

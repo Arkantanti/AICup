@@ -35,6 +35,7 @@ features_config = {
 
     'local_2d_circularity_max': True,
     'local_3d_circularity_mean': True,
+    'local_3d_circularity_std': True,
 
     'path_length': True,
     'step_mean': True,
