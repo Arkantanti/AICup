@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-def generate_ensemble_submission(models, features_config, test_path='../data/test.csv', output_file='../submissions/submission.csv'):
+def generate_ensemble_submission(models, features_config, class_names, test_path='../data/test.csv', output_file='../submissions/submission.csv'):
     """
     Inputs a list of trained XGBoost models, averages their predictions,
     and saves the species probabilities to a CSV file.
@@ -12,7 +12,7 @@ def generate_ensemble_submission(models, features_config, test_path='../data/tes
     
     from pre_processing import df_transform_experimental, prepare_for_training
     transformed_test = df_transform_experimental(test_df, features_config, labels=False)
-    X_test, _, _ = prepare_for_training(transformed_test, features_config)
+    X_test, _, _ = prepare_for_training(transformed_test, features_config, class_names)
     
     # 2. Collect probabilities from all models
     # We create a list of probability matrices (each is N_samples x 9_classes)
@@ -25,12 +25,9 @@ def generate_ensemble_submission(models, features_config, test_path='../data/tes
     # 3. Average the probabilities (Soft Voting)
     # np.mean across the new 'model' axis
     avg_probs = np.mean(all_probs, axis=0)
+
     
-    # 4. Create the submission DataFrame
-    CLASS_NAMES = ["Clutter", "Cormorants", "Pigeons", "Ducks", "Geese", 
-                   "Gulls", "Birds of Prey", "Waders", "Songbirds"]
-    
-    submission = pd.DataFrame(avg_probs, columns=CLASS_NAMES)
+    submission = pd.DataFrame(avg_probs, columns=class_names)
     submission.insert(0, 'track_id', track_ids)
     
     # 5. Save to file
