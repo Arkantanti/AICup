@@ -26,9 +26,10 @@ def run_cv_training_xgboost(X, y, class_names, params=None):
         'objective': 'multi:softprob',
         'num_class': len(class_names),
         'tree_method': 'hist',
+        'colsample_bytree': params.get('colsample_bytree', 1),
         'early_stopping_rounds': params.get('early_stopping_rounds', 50),
         'random_state': 42,
-        #'eval_metric': [macro_ap_xgboost,"mlogloss"],
+        'eval_metric': macro_ap_xgboost,
         'gamma': params.get('gamma', 0.1),
     }
 
@@ -84,7 +85,7 @@ def run_cv_training_xgboost(X, y, class_names, params=None):
 
         eval_results = model.evals_result()
 
-        metric = list(eval_results['validation_0'].keys())[0]
+        metric = list(eval_results['validation_0'].keys())[-1]
 
         # Get the score at the best iteration
         best_iter = model.best_iteration
